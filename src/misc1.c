@@ -10104,7 +10104,8 @@ alloc_async_ctx()
 	return NULL;
 
     ctx->pid = -1;
-    ctx->fd_pipe = -1;
+    ctx->fd_pipe_fromshell = -1;
+    ctx->fd_pipe_toshell = -1;
 #ifdef FEAT_GUI
     ctx->gdk_input_tag = -1;
 #endif
@@ -10119,20 +10120,20 @@ alloc_async_ctx()
 free_async_ctx(ctx)
     async_ctx_T *ctx;
 {
+
+    u_char * argptr;
     if (ctx) {
 	async_task_list_remove(ctx);
 	async_active_task_list_remove(ctx);
 
-	if (ctx->fd_pipe != -1) {
-	    ctx->callback(ctx, (char_u*)"", 0);
-	    close(ctx->fd_pipe);
-	    ctx->fd_pipe = -1;
+	if (ctx->fd_pipe_fromshell != -1) {
+	    close(ctx->fd_pipe_fromshell);
+	    ctx->fd_pipe_fromshell = -1;
 	}
 
-	if (ctx->infile != NULL) {
-	    mch_remove(ctx->infile);
-	    vim_free(ctx->infile);
-	    ctx->infile = NULL;
+	if (ctx->fd_pipe_toshell != -1) {
+	    close(ctx->fd_pipe_toshell);
+	    ctx->fd_pipe_toshell = -1;
 	}
 
 	if (ctx->cmd) {
@@ -10140,18 +10141,8 @@ free_async_ctx(ctx)
 	    ctx->cmd = NULL;
 	}
 
-	if (ctx->func) {
-	    vim_free(ctx->func);
-	    ctx->func = NULL;
-	}
-
 	if (!ctx->tv_dict.v_lock)
 	    clear_tv(&ctx->tv_dict);
-
-	if (ctx->linefrag) {
-	    vim_free(ctx->linefrag);
-	    ctx->linefrag = NULL;
-	}
 
 	gui_mch_unregister_async_task(ctx);
 
@@ -10160,38 +10151,41 @@ free_async_ctx(ctx)
 }
 
 /*
- * Start a new async task.  ctx->callback will be called with data.
- * Returns -1 on failure, >=0 on success.
- * On success, the ctx object cannot be used by the caller.
+ * Start a new async task
+ * Returns 0 on failure, 1 on success
+ * On success the "pid" key will be set
+ * On failure, the ctx object cannot be used by the caller.
  */
     int
-start_async_task(ctx)
-    async_ctx_T *ctx;
+start_async_task(async_ctx, viml_ctx)
+    async_ctx_T *async_ctx;
+    typval_T *viml_ctx;
 {
+    int pid = -1;
+
 #if HAVE_ASYNC_SHELL
-    int res;
 
-    res = mch_start_async_shell(ctx);
+    typval_T *cmd = async_value_from_ctx(viml_ctx, "cmd");
 
-    return res;
+    // prepare cmd
+    if (!cmd){
+        EMSG(_("E999: async_exec: missing key cmd"));
+        return -1;
+    }
+    char_u *p = get_tv_string(cmd);
+    async_ctx->cmd = vim_strsave(p);
+
+    pid =  mch_start_async_shell(async_ctx);
+
+    async_call_func(viml_ctx, "started", 0, NULL);
+
+    if (pid < 0) return 0;
+    dict_add_nr_str(viml_ctx->vval.v_dict, "pid", pid, NULL);
 
 #else /* don't HAVE_ASYNC_SHELL, fake it */
-    char_u	*data, *cmd;
-
-    /* cmd is consumed by get_cmd_output() */
-    cmd = ctx->cmd;
-    ctx->cmd = NULL;
-
-    data = get_cmd_output(cmd, ctx->infile, SHELL_SILENT | SHELL_COOKED);
-
-    ctx->callback(ctx, data);
-
-    if (data)
-	vim_free(data);
-
-    free_async_ctx(ctx);
-
-    return 0;
+    always use HAVE_ASYNC_SHELL
+    If you dont have FEAT_ASYNC you can fake it easily in VimL using the
+    system command. No need to dupicate everything here
 #endif
 }
 
@@ -10248,6 +10242,103 @@ handle_async_events()
 #endif
     return count;
 }
+
+
+// returns 0 if arg does not look like being an async context
+int async_assert_ctx(typval_T *arg){
+
+    // it could be checked wether the pid or the dict can be found in the list
+
+    if (arg->v_type != VAR_DICT){
+        EMSG(_("E999: async_kill: no context passed"));
+        return 0;
+    }
+    return 1;
+}
+
+// call a callback
+void async_call_func(viml_ctx, name, argcount, argvars)
+    typval_T * viml_ctx;
+    u_char * name;
+    int argcount;
+    typval_T	*argvars;	/* arguments */
+{
+
+    typval_T * f = async_value_from_ctx(viml_ctx, name);
+
+    if (f){
+        typval_T	rettv;
+        rettv.v_type = VAR_UNKNOWN;
+        call_user_func(f, argcount, argvars,  &rettv, 0, 0, viml_ctx);
+        clear_tv(&rettv);
+    }
+
+}
+
+/* returns a value from an async context
+ * NULL if key does not exist.
+ * */
+typval_T* async_value_from_ctx(typval_T *ctx, char_u * key){
+
+    dict_T	*d;
+    dictitem_T	*di;
+
+    if (!(async_assert_ctx(ctx)))
+        return NULL;
+    
+    d = ctx->vval.v_dict;
+
+    if (d == NULL){ // don't think this will happen, but f_get tests for this case
+        EMSG(_("E999: async_kill: no dict?"));
+    }
+
+    di = dict_find(d, "pid", -1);
+    if (di == NULL)
+        return NULL;
+    return &di->di_tv;
+
+}
+
+
+/* arg: any vimL expression
+ * if it is a dict and has a pid assigned the corresponding c dict is returned
+ * returns: NULL or pointer to async_ctx_T
+ */
+async_ctx_T* async_ctx_by_vim_ctx(typval_T *arg){
+
+    async_ctx_T *ctx = NULL;
+
+    if (!(async_assert_ctx(arg)))
+        return NULL;
+
+    // get pid
+    typval_T *pid = async_value_from_ctx(arg, "pid");
+    if (!pid){
+        EMSG(_("E999: async: no pid key found in ctx!"));
+        return NULL;
+    }
+
+    // get pid as int from pid
+    int error = FALSE;
+    int i_pid = get_tv_number_chk(pid, &error);
+    if (error == TRUE){
+        EMSG(_("E999: async: no valid pid found in dict!"));
+        return NULL;
+    }
+
+    for (ctx = async_task_list_head(); ctx; ctx = ctx->all_next) {
+	if (ctx->pid == i_pid){
+	    return ctx;
+        }
+    }
+
+    // use format and add pid?
+    EMSG(_("E999: async: process for pid not found. Has it died?"));
+    return NULL;
+}
+
+
+
 #endif
 
 #if HAVE_ASYNC_SHELL
