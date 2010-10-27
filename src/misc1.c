@@ -18,6 +18,7 @@ static char_u *vim_version_dir __ARGS((char_u *vimdir));
 static char_u *remove_tail __ARGS((char_u *p, char_u *pend, char_u *name));
 static int copy_indent __ARGS((int size, char_u	*src));
 
+
 /*
  * Count the size (in window cells) of the indent in the current line.
  */
@@ -10151,45 +10152,6 @@ free_async_ctx(ctx)
 }
 
 /*
- * Start a new async task
- * Returns 0 on failure, 1 on success
- * On success the "pid" key will be set
- * On failure, the ctx object cannot be used by the caller.
- */
-    int
-start_async_task(async_ctx, viml_ctx)
-    async_ctx_T *async_ctx;
-    typval_T *viml_ctx;
-{
-    int pid = -1;
-
-#if HAVE_ASYNC_SHELL
-
-    typval_T *cmd = async_value_from_ctx(viml_ctx, "cmd");
-
-    // prepare cmd
-    if (!cmd){
-        EMSG(_("E999: async_exec: missing key cmd"));
-        return -1;
-    }
-    char_u *p = get_tv_string(cmd);
-    async_ctx->cmd = vim_strsave(p);
-
-    pid =  mch_start_async_shell(async_ctx);
-
-    async_call_func(viml_ctx, "started", 0, NULL);
-
-    if (pid < 0) return 0;
-    dict_add_nr_str(viml_ctx->vval.v_dict, "pid", pid, NULL);
-
-#else /* don't HAVE_ASYNC_SHELL, fake it */
-    always use HAVE_ASYNC_SHELL
-    If you dont have FEAT_ASYNC you can fake it easily in VimL using the
-    system command. No need to dupicate everything here
-#endif
-}
-
-/*
  * Terminate an async task.
  * On success, the ctx object cannot be used by the caller.
  */
@@ -10256,25 +10218,6 @@ int async_assert_ctx(typval_T *arg){
     return 1;
 }
 
-// call a callback
-void async_call_func(viml_ctx, name, argcount, argvars)
-    typval_T * viml_ctx;
-    u_char * name;
-    int argcount;
-    typval_T	*argvars;	/* arguments */
-{
-
-    typval_T * f = async_value_from_ctx(viml_ctx, name);
-
-    if (f){
-        typval_T	rettv;
-        rettv.v_type = VAR_UNKNOWN;
-        call_user_func(f, argcount, argvars,  &rettv, 0, 0, viml_ctx);
-        clear_tv(&rettv);
-    }
-
-}
-
 /* returns a value from an async context
  * NULL if key does not exist.
  * */
@@ -10292,7 +10235,7 @@ typval_T* async_value_from_ctx(typval_T *ctx, char_u * key){
         EMSG(_("E999: async_kill: no dict?"));
     }
 
-    di = dict_find(d, "pid", -1);
+    di = dict_find(d, key, -1);
     if (di == NULL)
         return NULL;
     return &di->di_tv;

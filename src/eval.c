@@ -7674,8 +7674,8 @@ static struct fst
 #ifdef FEAT_ASYNC
     {"async_exec",	1, 1, f_async_exec},
     {"async_kill",	1, 1, f_async_kill},
-    {"async_list",	1, 1, f_async_list},
-    {"async_write",	1, 1, f_async_write},
+    {"async_list",	0, 0, f_async_list},
+    {"async_write",	2, 2, f_async_write},
     // {"async_read_until",1, 1, f_async_read_until},
 #endif
 #ifdef FEAT_FLOAT
@@ -17523,11 +17523,75 @@ f_async_write (argvars, rettv)
 
     size_t len = STRLEN(input);
     size_t written = write(ctx->fd_pipe_toshell, input, len);
-    flush(ctx->fd_pipe_toshell);
     if (written != len)
         EMSG(_("E999: async: failed writign all bytes"));
 }
 
+// call a callback
+void async_call_func(viml_ctx, name, argcount, argvars)
+    typval_T * viml_ctx;
+    u_char * name;
+    int argcount;
+    typval_T	*argvars;	/* arguments */
+{
+
+    typval_T * f = async_value_from_ctx(viml_ctx, name);
+
+    if (f){
+        if (f->v_type == VAR_FUNC){
+            typval_T	rettv;
+            rettv.v_type = VAR_UNKNOWN;
+            int dummy;
+            u_char *func = f->vval.v_string;
+            call_func(func, STRLEN(func), &rettv, argcount, argvars, 0, 0, &dummy, TRUE, viml_ctx->vval.v_dict);
+            clear_tv(&rettv);
+        } else {
+            EMSG(_("E999: async_kill: callable function expected"));
+        }
+    }
+}
+
+
+/*
+ * Start a new async task
+ * Returns 0 on failure, 1 on success
+ * On success the "pid" key will be set
+ * On failure, the ctx object cannot be used by the caller.
+ */
+    int
+start_async_task(async_ctx)
+    async_ctx_T *async_ctx;
+{
+    int pid = -1;
+
+#if HAVE_ASYNC_SHELL
+
+    typval_T *viml_ctx = &async_ctx->tv_dict;
+
+    typval_T *cmd = async_value_from_ctx(viml_ctx, "cmd");
+
+    // prepare cmd
+    if (!cmd){
+        EMSG(_("E999: async_exec: missing key cmd"));
+        return -1;
+    }
+    char_u *p = get_tv_string_chk(cmd);
+    if (!p) p = "";
+    async_ctx->cmd = vim_strsave(p);
+
+    pid =  mch_start_async_shell(async_ctx);
+
+    if (pid < 0) return 0;
+    dict_add_nr_str(viml_ctx->vval.v_dict, "pid", pid, NULL);
+    async_call_func(viml_ctx, "started", 0, NULL);
+
+
+#else /* don't HAVE_ASYNC_SHELL, fake it */
+    always use HAVE_ASYNC_SHELL
+    If you dont have FEAT_ASYNC you can fake it easily in VimL using the
+    system command. No need to dupicate everything here
+#endif
+}
 
 #endif
 

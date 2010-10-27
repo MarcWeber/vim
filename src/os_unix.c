@@ -4893,7 +4893,7 @@ async_call_receive(ctx, data, len)
 
     vim_memset(&funcrettv, 0, sizeof(typval_T));
 
-    async_call_func(ctx->tv_dict, "receive", 2, &funcargv);
+    async_call_func(&ctx->tv_dict, "receive", 2, &funcargv[0]);
 
 }
 
@@ -4950,7 +4950,7 @@ handle_one_async_task (ctx)
             dict_add_nr_str(ctx->tv_dict.vval.v_dict, "status", WEXITSTATUS(status), NULL);
         }
 
-        async_call_func(ctx, "terminated", 0, NULL);
+        async_call_func(&ctx->tv_dict, "terminated", 0, (typval_T *) NULL);
 
 	free_async_ctx(ctx);
 
