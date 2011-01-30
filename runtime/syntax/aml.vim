@@ -53,7 +53,7 @@ syn keyword amlInfoCmd contained  accept add adir alter dialog alter alt directo
 
 " VTRACE reserved words, defined as keywords.
 
-syn keyword amlVtrCmd contained  add al arcscan arrowlength arrowwidth as aw backtrack branch bt cj clearjunction commands cs dash endofline endofsession eol eos fan fg foreground gap generalizetolerance gtol help hole js junctionsensitivity linesymbol linevariation linewidth ls lv lw markersymbol mode ms raster regionofinterest reset restore retrace roi save searchradius skip sr sta status stc std str straightenangle straightencorner straightendistance straightenrange vt vtrace
+syn keyword amlVtrCmd contained  add al arcscan arrowlength arrowwidth as aw backtrack branch bt cj clearjunction commands cs dash endofline endofsession eol eos fan fg forcendofline feol foreground gap generalizetolerance gtol help hole js junctionsensitivity linesymbol linevariation linewidth ls lv lw markersymbol mode ms raster regionofinterest reset restore retrace roi save searchradius skip sr sta status stc std str straightenangle straightencorner straightendistance straightenrange vt vtrace
 
 " The AML reserved words, defined as keywords.
 

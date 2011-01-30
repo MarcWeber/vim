@@ -1004,6 +1004,7 @@ enum
     , BV_TW
     , BV_TX
     , BV_WM
+    , BV_FEOL
     , BV_COUNT	    /* must be the last one */
 };
 

@@ -2426,16 +2426,12 @@ A jump table for the options with a short description can be found at |Q_op|.
 'endofline' 'eol'	boolean	(default on)
 			local to buffer
 			{not in Vi}
-	When writing a file and this option is off and the 'binary' option
-	is on, no <EOL> will be written for the last line in the file.  This
-	option is automatically set when starting to edit a new file, unless
-	the file does not have an <EOL> for the last line in the file, in
-	which case it is reset.  Normally you don't have to set or reset this
-	option.  When 'binary' is off the value is not used when writing the
-	file.  When 'binary' is on it is used to remember the presence of a
-	<EOL> for the last line in the file, so that when you write the file
-	the situation from the original file can be kept.  But you can change
-	it if you want to.
+        When writing a file and this option is off and either the 'binary'
+        option is on or 'forceendofline' is off, no <EOL> will be written
+        for the last line in the file.  This option is automatically set when
+        starting to edit a new file, unless the file does not have an <EOL>
+        for the last line in the file, in which case it is reset.  Normally
+        you don't have to set or reset this option.
 
 			     *'equalalways'* *'ea'* *'noequalalways'* *'noea'*
 'equalalways' 'ea'	boolean	(default on)
@@ -3000,6 +2996,15 @@ A jump table for the options with a short description can be found at |Q_op|.
 	It is not allowed to change text or jump to another window while
 	evaluating 'foldtext' |textlock|.
 
+		*'forceendofline'* *'feol'* *'noforceendofline'* *'nofeol'*
+'forceendofline' 'feol'	boolean	(default on)
+			local to buffer
+			{not in Vi}
+	If set non binary files are always written with a final EOL bytes.
+        Unset this otion to make Vim write the last line the way it was read
+        (which is the way 'endofline' is set)
+
+			     *'equalalways'* *'ea'* *'noequalalways'* *'noea'*
 					*'formatoptions'* *'fo'*
 'formatoptions' 'fo'	string (Vim default: "tcq", Vi default: "vt")
 			local to buffer

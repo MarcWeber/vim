@@ -1361,6 +1361,7 @@ struct file_buffer
     char_u	*b_p_ofu;	/* 'omnifunc' */
 #endif
     int		b_p_eol;	/* 'endofline' */
+    int		b_feol;	/* 'endofline' */
     int		b_p_et;		/* 'expandtab' */
     int		b_p_et_nobin;	/* b_p_et saved for binary mode */
 #ifdef FEAT_MBYTE

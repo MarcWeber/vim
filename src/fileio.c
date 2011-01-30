@@ -4313,7 +4313,7 @@ restore_backup:
 	/* write failed or last line has no EOL: stop here */
 	if (end == 0
 		|| (lnum == end
-		    && write_bin
+		    && (write_bin || !buf->b_feol)
 		    && (lnum == write_no_eol_lnum
 			|| (lnum == buf->b_ml.ml_line_count && !buf->b_p_eol))))
 	{

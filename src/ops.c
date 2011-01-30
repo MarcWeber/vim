@@ -6406,7 +6406,7 @@ cursor_pos_info()
 		    byte_count_cursor += line_count_info(s, &word_count_cursor,
 					   &char_count_cursor, len, eol_size);
 		    if (lnum == curbuf->b_ml.ml_line_count
-			    && !curbuf->b_p_eol
+			    && (!curbuf->b_p_eol && curbuf->b_feol )
 			    && curbuf->b_p_bin
 			    && (long)STRLEN(s) < len)
 			byte_count_cursor -= eol_size;

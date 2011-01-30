@@ -3570,7 +3570,7 @@ get_buf_size(buf_T *bufp)
 	    }
 	}
 	/* Correction for when last line doesn't have an EOL. */
-	if (!bufp->b_p_eol && bufp->b_p_bin)
+	if (!bufp->b_p_eol && (bufp->b_p_bin || !bufp->b_feol ))
 	    char_count -= eol_size;
     }
 

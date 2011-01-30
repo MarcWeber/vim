@@ -96,6 +96,7 @@
 # define PV_INC		OPT_BOTH(OPT_BUF(BV_INC))
 #endif
 #define PV_EOL		OPT_BUF(BV_EOL)
+#define PV_FEOL		OPT_BUF(BV_FEOL)
 #define PV_EP		OPT_BOTH(OPT_BUF(BV_EP))
 #define PV_ET		OPT_BUF(BV_ET)
 #ifdef FEAT_MBYTE
@@ -290,6 +291,7 @@ static char_u	*p_cfu;
 static char_u	*p_ofu;
 #endif
 static int	p_eol;
+static int	p_feol;
 static int	p_et;
 #ifdef FEAT_MBYTE
 static char_u	*p_fenc;
@@ -1133,6 +1135,10 @@ static struct vimoption
 # endif
 			    SCRIPTID_INIT},
 #endif
+    {"forceendofline",   "feol",  P_BOOL|P_NO_MKRC|P_VI_DEF|P_RSTAT,
+			    (char_u *)&p_feol, PV_FEOL,
+			    {(char_u *)TRUE, (char_u *)0L} SCRIPTID_INIT},
+
     {"formatexpr", "fex",   P_STRING|P_ALLOCED|P_VI_DEF|P_VIM,
 #ifdef FEAT_EVAL
 			    (char_u *)&p_fex, PV_FEX,
@@ -3187,6 +3193,7 @@ set_init_1()
 
     curbuf->b_p_initialized = TRUE;
     curbuf->b_p_ar = -1;	/* no local 'autoread' value */
+    curbuf->b_feol = 1; // Bram prefers this default ..
     check_buf_options(curbuf);
     check_win_options(curwin);
     check_options();
@@ -8368,7 +8375,7 @@ get_option_value(name, numval, stringval, opt_flags)
     else
     {
 	/* Special case: 'modified' is b_changed, but we also want to consider
-	 * it set when 'ff' or 'fenc' changed. */
+	 * it set when 'ff' or 'fenc' or 'eol' changed. */
 	if ((int *)varp == &curbuf->b_changed)
 	    *numval = curbufIsChanged();
 	else
@@ -10961,10 +10968,10 @@ file_ff_differs(buf)
 	return FALSE;
     if (buf->b_start_ffc != *buf->b_p_ff)
 	return TRUE;
-    if (buf->b_p_bin && buf->b_start_eol != buf->b_p_eol)
+    if ((buf->b_p_bin || !buf->b_feol) && buf->b_start_eol != buf->b_p_eol)
 	return TRUE;
 #ifdef FEAT_MBYTE
-    if (!buf->b_p_bin && buf->b_start_bomb != buf->b_p_bomb)
+    if ((!buf->b_p_bin && !buf->b_feol) && buf->b_start_bomb != buf->b_p_bomb)
 	return TRUE;
     if (buf->b_start_fenc == NULL)
 	return (*buf->b_p_fenc != NUL);
