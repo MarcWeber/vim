@@ -1136,7 +1136,7 @@ static struct vimoption
 			    SCRIPTID_INIT},
 #endif
     {"forceendofline",   "feol",  P_BOOL|P_NO_MKRC|P_VI_DEF|P_RSTAT,
-			    (char_u *)&p_feol, PV_FEOL,
+			    (char_u *)&p_feol, PV_EOL,
 			    {(char_u *)TRUE, (char_u *)0L} SCRIPTID_INIT},
 
     {"formatexpr", "fex",   P_STRING|P_ALLOCED|P_VI_DEF|P_VIM,
